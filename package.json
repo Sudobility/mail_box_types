@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/mail_box_types",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "description": "TypeScript types for Mail Box services - indexer, WildDuck, and KYC",
   "type": "module",
   "main": "./dist/index.js",

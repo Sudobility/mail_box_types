@@ -6,6 +6,15 @@ export type {
   IndexerEmailAccountsResult,
   IndexerEmailAccountsResponse,
 
+  // Custom (user-defined) address types
+  NameServiceKind,
+  CustomAddressRejectReason,
+  IndexerCustomAddressData,
+  IndexerCustomAddressResponse,
+  IndexerCustomAddressAvailabilityData,
+  IndexerCustomAddressAvailabilityResponse,
+  IndexerSetCustomAddressRequest,
+
   // Rewards types
   IndexerRewardData,
   IndexerRewardHistoryData,

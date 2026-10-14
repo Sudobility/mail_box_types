@@ -18,6 +18,12 @@ export interface IndexerNameServiceAccount {
 // Email address aggregation types
 export interface IndexerWalletAccount extends WalletData {
   names: IndexerNameServiceAccount[];
+  /**
+   * User-defined custom address local-part (lowercased) this wallet has set,
+   * if any (feature: user-defined addresses). The full email is
+   * `${customAddress}@${emailDomain}`.
+   */
+  customAddress?: Optional<string>;
 }
 
 export interface IndexerEmailAccountsResult {
@@ -26,6 +32,54 @@ export interface IndexerEmailAccountsResult {
 
 export type IndexerEmailAccountsResponse =
   ApiResponse<IndexerEmailAccountsResult>;
+
+// Custom (user-defined) address types
+/** Which name service claims a given postfix. */
+export type NameServiceKind = 'ENS' | 'SNS';
+
+/** Reasons a desired custom address can be rejected. */
+export type CustomAddressRejectReason =
+  | 'taken' // already claimed by another user
+  | 'reserved' // system-reserved / blocklisted name
+  | 'wallet_address' // parses as a wallet-address string
+  | 'name_service_postfix' // postfix is an ENS/SNS postfix (rule 2)
+  | 'invalid_format' // fails normal email local-part rules
+  | 'no_credits' // user has already used their set allowance (rule 3)
+  | 'already_set'; // user already has an active custom address
+
+/** Current custom-address state for a wallet. */
+export interface IndexerCustomAddressData extends WalletData {
+  /** The user-defined local part (e.g. "john"), lowercased; null if none set. */
+  customAddress: Optional<string>;
+  /**
+   * Remaining number of times the user may (re)set a custom address.
+   * Starts at 1; a rule-4 auto-clear grants one more.
+   */
+  creditsRemaining: number;
+}
+
+export type IndexerCustomAddressResponse =
+  ApiResponse<IndexerCustomAddressData>;
+
+/** Availability result for a desired custom address local part. */
+export interface IndexerCustomAddressAvailabilityData {
+  /** The normalized (lowercased) local part that was checked. */
+  name: string;
+  available: boolean;
+  /** Present when available === false. */
+  reason?: Optional<CustomAddressRejectReason>;
+  /** For `name_service_postfix` rejections: which service claims the postfix. */
+  service?: Optional<NameServiceKind>;
+}
+
+export type IndexerCustomAddressAvailabilityResponse =
+  ApiResponse<IndexerCustomAddressAvailabilityData>;
+
+/** Request body for setting a wallet's custom address. */
+export interface IndexerSetCustomAddressRequest {
+  /** Desired custom address local part (lowercased server-side). */
+  address: string;
+}
 
 // Rewards history record
 export interface IndexerRewardData {
