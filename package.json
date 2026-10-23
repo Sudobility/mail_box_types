@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/mail_box_types",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "description": "TypeScript types for Mail Box services - indexer, WildDuck, and KYC",
   "type": "module",
   "main": "./dist/index.js",
@@ -43,7 +43,7 @@
   "license": "BUSL-1.1",
   "devDependencies": {
     "@eslint/js": "~9.39.5",
-    "@sudobility/types": "^1.9.75",
+    "@sudobility/types": "^1.9.76",
     "@types/node": "~24.19.2",
     "@typescript-eslint/eslint-plugin": "~8.72.0",
     "@typescript-eslint/parser": "~8.72.0",
@@ -58,7 +58,7 @@
     "vitest": "~4.1.12"
   },
   "peerDependencies": {
-    "@sudobility/types": "^1.9.75"
+    "@sudobility/types": "^1.9.76"
   },
   "publishConfig": {
     "access": "public"
