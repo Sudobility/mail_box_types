@@ -4,6 +4,13 @@ TypeScript type definitions, enums, type guards, and helper functions for the 0x
 
 ## Installation
 
+This package is published to **GitHub Packages** under the `@sudobility` scope, not the public npm registry. Consumers need an `.npmrc` pointing the scope at GitHub Packages plus a token with `read:packages`:
+
+```
+@sudobility:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GH_PACKAGES_READ_TOKEN}
+```
+
 ```bash
 bun add @sudobility/mail_box_types
 ```
@@ -47,7 +54,7 @@ import {
 
 ### Indexer (`types/indexer/`)
 - ~50 response interfaces (accounts, rewards, points, delegation, name service, auth, referrals, templates, webhooks)
-- 22 runtime type guards (`isEmailAccountsResponse`, `isRewardsResponse`, etc.)
+- 25 runtime type guards (`isEmailAccountsResponse`, `isRewardsResponse`, etc.)
 
 ### WildDuck REST (`types/wildduck/`)
 - ~80 interfaces for users, mailboxes, messages, addresses, filters, settings, DKIM, webhooks
@@ -68,9 +75,10 @@ import {
 
 ```bash
 bun install
-bun run verify          # typecheck + lint + test + build
-bun run test            # Vitest
-bun run build           # ESM + CJS outputs
+bun run verify          # typecheck + lint + test:unit + build
+bun run test:unit       # Vitest (run once)
+bun run test:watch      # Vitest watch mode
+bun run build           # ESM build (tsc -p tsconfig.esm.json) -> dist/
 bun run dev             # tsc --watch
 ```
 

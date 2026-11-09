@@ -1,295 +1,109 @@
 # mail_box_types - AI Development Guide
 
-> **Git policy — never auto-commit or auto-push.** Leave your work in the working tree.
-> Run `git commit`, `git push`, `gh pr create`, or `scripts/push_all.sh` **only when the user
-> explicitly asks in that turn**. Approval for an earlier change does not carry forward, and
-> finishing a task is not permission to commit it.
+> **Git policy — never auto-commit or auto-push.** Leave work in the working tree.
+> Run `git commit`, `git push`, or `gh pr create` **only when the user explicitly asks in
+> that turn**. Approval for an earlier change does not carry forward, and finishing a task is
+> not permission to commit it. Stay on the current branch; do not create feature branches.
 
 ## Overview
 
-`@sudobility/mail_box_types` is a TypeScript types-only library that provides comprehensive type definitions, enums, type guards, and helper functions for the Mail Box protocol. It covers four domains: the blockchain Indexer API, the WildDuck mail server (REST and WebSocket), KYC/Sumsub identity verification, and multi-chain mailbox smart contract interactions (EVM and Solana). All runtime values (enums, type guards, factory functions) are shipped alongside pure type definitions.
+`@sudobility/mail_box_types` is a **types-only TypeScript library** for the Mail Box / 0xMail
+protocol. It ships type definitions, enums, type guards, and small factory/helper functions for
+four domains: the blockchain **Indexer** API, the **WildDuck** mail server (REST + WebSocket),
+**KYC**/Sumsub identity verification, and multi-chain **mailer** smart-contract responses (EVM +
+Solana). All runtime values (enums, `is*` guards, `create*` factories, helper consts) ship
+alongside the pure types.
 
-- **Package**: `@sudobility/mail_box_types`
-- **Version**: 1.0.10
-- **License**: BUSL-1.1
-- **Package Manager**: Bun (always use `bun` commands, never `npm`)
-- **Module Format**: Dual ESM (`dist/index.js`) + CommonJS (`dist/index.cjs`) with TypeScript declarations (`dist/index.d.ts`)
+- **Package manager**: Bun only — use `bun`/`bun run`, never `npm`.
+- **Module format**: **ESM only.** `build` runs `tsc -p tsconfig.esm.json` -> `dist/index.js`
+  + `dist/index.d.ts` (with source + declaration maps). There is **no CommonJS/`.cjs` build**;
+  `package.json` `exports` exposes only `import`/`types`. (Do not describe this package as dual
+  ESM+CJS — that is wrong.)
+- **License**: BUSL-1.1.
 
-## Project Structure
+## Registry / publishing (non-obvious)
+
+- Published to **GitHub Packages**, not public npm. `.npmrc` sets
+  `@sudobility:registry=https://npm.pkg.github.com`. Installing `@sudobility/*` deps requires a
+  token with `read:packages` (CI uses secret `GH_PACKAGES_READ_TOKEN`).
+- Publishing is handled by CI (`.github/workflows/ci-cd.yml`, reusable
+  `johnqh/workflows` with `publish-target: github`) on push to `main`/`develop`. `prepublishOnly`
+  runs `clean` + `verify`.
+
+## Commands (all verified)
+
+```bash
+bun install
+bun run typecheck      # tsc --noEmit
+bun run lint           # eslint src --ext .ts
+bun run lint:fix
+bun run format         # prettier --write
+bun run format:check
+bun run test:unit      # vitest run (NOTE: script is test:unit — there is NO `bun run test`)
+bun run test:watch
+bun run test:coverage  # v8 provider
+bun run build          # tsc -p tsconfig.esm.json -> dist/ (ESM only)
+bun run clean          # rimraf dist
+bun run verify         # typecheck + lint + test:unit + build  (run before publishing)
+bun run dev            # tsc --watch
+```
+
+Current state: `typecheck`, `lint`, `build` clean; `test:unit` = 368 tests across 5 files passing.
+
+## Structure
 
 ```
 src/
-├── index.ts                                 # Root entry point, re-exports ./types
-└── types/
-    ├── index.ts                             # Aggregates and re-exports all 4 modules
-    ├── indexer/
-    │   ├── index.ts                         # Named re-exports of all indexer types & guards
-    │   ├── indexer-responses.ts             # ~50 interfaces/types for Indexer API responses
-    │   ├── indexer-guards.ts                # 22 runtime type guard functions
-    │   └── indexer-guards.test.ts           # Tests for indexer type guards
-    ├── wildduck/
-    │   ├── index.ts                         # Re-exports REST + WebSocket types
-    │   ├── wildduck-types.ts               # ~80 interfaces for WildDuck REST API
-    │   ├── wildduck-websocket-types.ts     # ~50 interfaces for WildDuck WebSocket API
-    │   ├── wildduck-types.test.ts           # Tests for REST type guards & helpers
-    │   └── wildduck-websocket-types.test.ts # Tests for WebSocket type guards & helpers
-    ├── kyc/
-    │   ├── index.ts                         # Re-exports KYC types
-    │   ├── kyc-types.ts                     # ~25 interfaces + 6 enums for KYC/Sumsub
-    │   └── kyc-types.test.ts               # Tests for KYC enums & types
-    └── mailer/
-        ├── index.ts                         # Re-exports mailer types
-        ├── mail-types.ts                    # ~25 interfaces + 3 enums for contract responses
-        └── mail-types.test.ts              # Tests for mailer type guards & enums
+  index.ts                 # re-exports ./types
+  types/
+    index.ts               # barrel: re-exports all 4 modules
+    indexer/               # indexer-responses.ts (~50 types), indexer-guards.ts (25 `is*` guards), index.ts, *.test.ts
+    wildduck/              # wildduck-types.ts (REST, ~80 types), wildduck-websocket-types.ts (WS, ~50 types), index.ts, *.test.ts
+    kyc/                   # kyc-types.ts (~25 interfaces + 6 enums), index.ts, kyc-types.test.ts
+    mailer/                # mail-types.ts (~25 interfaces + 3 enums), index.ts, mail-types.test.ts
 ```
 
-## Key Type Categories
+Each module: `*-types.ts` holds interfaces/enums/factories; guards are **co-located in the type
+file for wildduck/kyc/mailer** but live in a **separate `indexer-guards.ts`** for indexer. Each
+module has an `index.ts` barrel; tests are co-located `*.test.ts`.
 
-### Indexer Types (`types/indexer/`)
+## Conventions
 
-API response types for the Mail Box Indexer service. Every response wraps data via `ApiResponse<T>` from `@sudobility/types`.
+- **Named exports only** — no default exports. Pure types via `export type`/`export interface`;
+  runtime values via `export function`/`export const`/`export enum`.
+- Indexer `is*` guards are `export function`; wildduck REST guards (`isWildduckAuthResponse`,
+  `isWildduckMessage`) and helpers (`EmailFolderUtils`) are `export const`.
+- Naming: interfaces PascalCase domain-prefixed (`Indexer*`, `Wildduck*`, `KYC*`); guards
+  `isXxx`; factories `createXxx`; requests `*Request`, responses `*Response`, paginated entries
+  `*ListItem`.
+- **Response shapes differ per domain**: indexer wraps data in `ApiResponse<T>` (from
+  `@sudobility/types`); wildduck uses `{ success: boolean; ... }`; mailer extends
+  `TransactionReceipt`/`BaseTransactionResponse` for chain ops and `BaseResponse`/
+  `PaginatedResponse` (from `@sudobility/types`) for queries.
+- Intra-package imports use explicit `.js` extensions (e.g. `./types/index.js`) — required for
+  ESM resolution; keep them.
 
-| Category | Key Types |
-|----------|-----------|
-| Email Accounts | `IndexerNameServiceAccount`, `IndexerWalletAccount`, `IndexerEmailAccountsResponse` |
-| Rewards / Points | `IndexerRewardData`, `IndexerRewardsResponse`, `IndexerPointsData`, `IndexerPointsResponse`, `IndexerLeaderboardResponse` |
-| Delegation | `IndexerDelegateData`, `IndexerDelegatedToResponse`, `IndexerDelegatedFromResponse` |
-| Name Service | `IndexerNameServiceData`, `IndexerNameResolutionData` |
-| Address Validation | `IndexerAddressValidationData`, `IndexerAddressValidationResponse` |
-| Entitlement | `IndexerEntitlementInfo`, `IndexerEntitlementResponse` |
-| Authentication | `IndexerAuthenticationStatusData`, `IndexerSignInMessageData`, `IndexerNonceData` |
-| Referrals | `IndexerReferralCodeData`, `IndexerReferralStatsData` |
-| Block Status | `IndexerChainBlockInfo`, `IndexerBlockStatusData` |
-| Site Stats | `IndexerSiteStatsData`, `IndexerSiteStatsResponse` |
-| Templates | `IndexerTemplateData`, `IndexerTemplateCreateRequest`, `IndexerTemplateUpdateRequest` |
-| Webhooks | `IndexerWebhookData`, `IndexerWebhookCreateRequest` |
-| Error | `IndexerErrorResponse` |
-| Union | `IndexerApiResponse` (union of all response types) |
+## Gotchas
 
-**Type guards** (22 functions): `isEmailAccountsResponse`, `isRewardsResponse`, `isDelegatedToResponse`, `isIndexerErrorResponse`, `isIndexerSuccessResponse`, etc.
+- `@sudobility/types` is a **peerDependency** (`^1.9.78`) and also devDependency. Shared utility
+  types (`Optional`, `ChainType`, `WalletData`, `ApiResponse`, `BaseResponse`,
+  `PaginatedResponse`, `MessageBase`, `UnifiedError`) come from it — import from there, do not
+  redefine.
+- **Two eslint configs exist**: `eslint.config.js` is the active flat config ESLint loads;
+  `eslint.config.mjs` is stale/unused — edit `eslint.config.js`.
+- Prettier (`.prettierrc`): single quotes, semicolons, `trailingComma: es5`, 80-col, 2-space.
+- tsconfig: `strict`, `target ES2020`, `moduleResolution bundler`, `isolatedModules`; base
+  `tsconfig.json` has `noEmit: true` (typecheck), `tsconfig.esm.json` flips `noEmit: false` +
+  `declaration` for the build. `*.test.ts`/`*.spec.ts` are excluded from compilation.
+- Coverage (`vitest.config.ts`) excludes `*.test.ts` and `index.ts` barrels.
 
-### WildDuck REST Types (`types/wildduck/wildduck-types.ts`)
+## Adding types
 
-Comprehensive types matching the WildDuck Mail Server API specification.
+1. Edit the module's `*-types.ts` (indexer guards go in `indexer-guards.ts`).
+2. Re-export from that module's `index.ts`; new modules also need `export * from './mod';` in
+   `src/types/index.ts`.
+3. Add `is*`/`create*` following the conventions; write/extend the co-located `*.test.ts`
+   (cover guards with valid + invalid/partial/null inputs, factory defaults, enum string values).
+4. `bun run verify`.
 
-| Category | Key Types |
-|----------|-----------|
-| Config | `WildduckConfig`, `WildduckObjectId` |
-| Authentication | `WildduckPreAuthRequest/Response`, `WildduckAuthenticateRequest`, `WildduckAuthResponse`, `WildduckUserAuth` |
-| Users | `WildduckUser`, `WildduckUserResponse`, `WildduckCreateUserRequest/Response`, `WildduckUpdateUserRequest`, `WildduckUserListResponse` |
-| Mailboxes | `WildduckMailbox`, `WildduckMailboxResponse`, `MailboxSpecialUse` (enum), `EmailFolder`, `EmailFolderUtils` |
-| Messages | `WildduckMessageListItem`, `WildduckMessageDetail`, `WildduckMessagesResponse`, `WildduckSearchMessagesRequest/Response` |
-| Message Ops | `WildduckUploadMessageRequest/Response`, `WildduckSubmitMessageRequest/Response`, `WildduckUpdateMessageRequest/Response` |
-| Addresses | `WildduckAddress`, `WildduckAddressListResponse`, `WildduckCreateAddressRequest/Response`, `WildduckForwardedAddressListItem` |
-| Filters | `FilterQuery`, `FilterAction`, `WildduckFilterListItem`, `WildduckCreateFilterRequest/Response` |
-| Autoreply | `WildduckAutoreplyRequest`, `WildduckAutoreplyResponse` |
-| ASP | `WildduckASPListItem`, `WildduckCreateASPRequest/Response` |
-| Storage | `WildduckStorageUploadRequest/Response`, `WildduckStorageListItem` |
-| Settings | `WildduckSettingItem`, `WildduckSettingsListResponse`, `UserInfo`, `AutoReplySettings`, `SpamSettings`, `AdvancedSettings`, `SMTPRelay` |
-| DKIM | `WildduckDKIMListItem`, `WildduckCreateDKIMRequest/Response` |
-| Webhooks | `WildduckWebhookListItem`, `WildduckCreateWebhookRequest/Response` |
-| Audit | `WildduckCreateAuditRequest/Response`, `WildduckAuditResponse` |
-| Health | `WildduckHealthResponse` |
-| Common | `WildduckPaginationParams`, `WildduckSessionParams`, `WildduckLimits`, `WildduckSuccessResponse`, `WildduckDeleteResponse`, `WildduckErrorResponse` |
-
-**Enum**: `MailboxSpecialUse` (Inbox, Sent, Trash, Drafts, Junk, Settings, Developer)
-
-**Helper objects**: `EmailFolderUtils` (isStandardFolder, getStandardFolders, isCustomFolder, displayName)
-
-**Factory functions**: `createPreAuthRequest()`, `createAuthenticateRequest()`
-
-**Type guards**: `isWildduckAuthResponse()`, `isWildduckMessage()`
-
-### WildDuck WebSocket Types (`types/wildduck/wildduck-websocket-types.ts`)
-
-Real-time WebSocket communication types for five channels: `mailboxes`, `settings`, `filters`, `autoreply`, `messages`.
-
-| Category | Key Types |
-|----------|-----------|
-| Channels | `WildduckWebSocketChannel`, `WildduckWebSocketMessageType` |
-| Base | `WildduckWebSocketMessage<T>`, `WildduckWebSocketAuthData`, `WildduckWebSocketResponseData<T>` |
-| Client Requests | `WildduckSubscribeRequest` (union), `WildduckUnsubscribeRequest`, `WildduckFetchMessagesRequest`, `WildduckWebSocketClientMessage` (union) |
-| Data Responses | `WildduckMailboxesDataResponse`, `WildduckSettingsDataResponse`, `WildduckFiltersDataResponse`, `WildduckAutoreplyDataResponse`, `WildduckMessagesDataResponse` |
-| Data Messages | `WildduckWebSocketDataMessage` (union of all channel data messages) |
-| Update Events | `WildduckMailboxUpdateEvent`, `WildduckMessageUpdateEvent`, `WildduckSettingsUpdateEvent`, `WildduckFilterUpdateEvent`, `WildduckAutoreplyUpdateEvent` |
-| Update Messages | `WildduckWebSocketUpdateMessage` (union) |
-| Disconnect | `WildduckDisconnectMessage` |
-| All Messages | `WildduckWebSocketServerMessage` (union), `WildduckAnyWebSocketMessage` (union) |
-
-**Type guards**: `isWildduckSubscribeRequest()`, `isWildduckUnsubscribeRequest()`, `isWildduckFetchRequest()`, `isWildduckDataMessage()`, `isWildduckUpdateMessage()`, `isWildduckDisconnectMessage()`, `isWildduckWebSocketErrorResponse()`
-
-**Factory functions**: `createWildduckSubscribeRequest()`, `createWildduckUnsubscribeRequest()`, `createWildduckFetchMessagesRequest()`
-
-### KYC Types (`types/kyc/kyc-types.ts`)
-
-Know Your Customer verification types integrating with Sumsub for three-tier identity verification (Basic, Enhanced, Accredited).
-
-| Category | Key Types |
-|----------|-----------|
-| Enums | `KYCVerificationLevel`, `KYCApplicationStatus`, `SumsubReviewStatus`, `SumsubReviewAnswer`, `ApplicantType`, `ReviewRejectType` |
-| DB Models | `KYCApplication`, `VerificationResult`, `UserConsent` |
-| Sumsub API | `SumsubConfig`, `SumsubApplicantData`, `SumsubWebhookPayload`, `SumsubApplicantStatus` |
-| API Requests | `InitiateKYCRequest`, `VerifyUserRequest`, `RevokeConsentRequest` |
-| API Responses | `InitiateKYCResponse`, `GetKYCStatusResponse`, `VerificationLevelStatus`, `VerifyUserResponse`, `RevokeConsentResponse`, `GetConsentsResponse` |
-
-### Mailer Types (`types/mailer/mail-types.ts`)
-
-Mailbox smart contract response types for multi-chain (EVM + Solana) messaging.
-
-| Category | Key Types |
-|----------|-----------|
-| Enums | `ConfirmationStatus` (Processed/Confirmed/Finalized), `ClaimType` (Recipient/Owner/Expired), `FeeType` (Send/Delegation/Registration) |
-| Core Responses | `BaseTransactionResponse`, `TransactionReceipt` |
-| Message Ops | `MessageSendResponse`, `PreparedMessageSendResponse` |
-| Revenue & Claims | `ClaimableInfo`, `ClaimRevenueResponse`, `ClaimableAmountResponse` |
-| Domain & Delegation | `DomainRegistrationResponse`, `MailboxDelegationResponse`, `DelegationRejectionResponse` |
-| Fee Management | `FeeInfo`, `FeeUpdateResponse` |
-| Contract State | `PauseInfo`, `PauseResponse`, `EmergencyDistributionResponse` |
-| Chain-Specific | `EVMTransactionResponse`, `SolanaTransactionResponse` |
-| Client Types | `UnifiedClientResponse<T>`, `BatchOperationResponse` |
-| Query Types | `MessageHistoryItem`, `MessageHistoryResponse`, `DelegationStatusResponse` |
-| Error | `ContractError` (alias for `UnifiedError`) |
-
-**Type guards**: `isEVMResponse()`, `isSolanaResponse()`, `isMailboxErrorResponse()`, `isConfirmationStatus()`, `isClaimType()`, `isFeeType()`, `isBaseTransactionResponse()`, `isMessageSendResponse()`, `isClaimableInfo()`
-
-## Development Commands
-
-```bash
-# Install dependencies
-bun install
-
-# Type checking (no emit)
-bun run typecheck
-
-# Linting
-bun run lint
-bun run lint:fix
-
-# Formatting
-bun run format
-bun run format:check
-
-# Testing
-bun run test              # Run all tests (Vitest)
-bun run test:watch        # Watch mode
-bun run test:coverage     # Coverage report (v8 provider)
-
-# Building
-bun run build             # Build ESM + CJS outputs
-bun run clean             # Remove dist/
-
-# Full verification pipeline
-bun run verify            # typecheck + lint + test + build
-
-# Dev mode
-bun run dev               # tsc --watch
-```
-
-## Architecture / Patterns
-
-### Module Organization
-
-Each type domain lives in its own subdirectory under `src/types/` with a consistent structure:
-- `*-types.ts` -- Interfaces, type aliases, enums, factory functions
-- `*-guards.ts` -- Runtime type guard functions (indexer only; other modules co-locate guards)
-- `index.ts` -- Named re-exports for the module
-- `*.test.ts` -- Vitest tests co-located alongside source
-
-The root `src/types/index.ts` barrel-exports all four modules, and `src/index.ts` re-exports that barrel.
-
-### Naming Conventions
-
-- **Interfaces**: PascalCase, prefixed by domain (`Indexer*`, `Wildduck*`, `KYC*`)
-- **Enums**: PascalCase with PascalCase members (e.g., `MailboxSpecialUse.Inbox`, `ConfirmationStatus.Finalized`)
-- **Type guards**: camelCase, prefixed with `is` (e.g., `isEVMResponse`, `isIndexerErrorResponse`)
-- **Factory/helper functions**: camelCase, prefixed with `create` (e.g., `createPreAuthRequest`, `createWildduckSubscribeRequest`)
-- **Request types**: `*Request` suffix
-- **Response types**: `*Response` suffix
-- **List items**: `*ListItem` suffix for paginated result entries
-
-### Export Conventions
-
-All exports are **named exports only** -- no default exports. Types are exported with `export type` or `export interface`; runtime values use `export function`, `export enum`, or `export const`.
-
-### API Response Pattern
-
-Indexer responses use the generic `ApiResponse<T>` wrapper from `@sudobility/types`:
-```typescript
-export interface IndexerPointsData extends WalletData { ... }
-export type IndexerPointsResponse = ApiResponse<IndexerPointsData>;
-```
-
-WildDuck responses use a simpler `{ success: boolean; ... }` pattern.
-
-Mailer responses extend `TransactionReceipt` (which extends `BaseTransactionResponse`) for blockchain operations, and `BaseResponse<T>` / `PaginatedResponse<T>` from `@sudobility/types` for client-facing queries.
-
-### Type Guard Pattern
-
-```typescript
-export function isMyResponse(response: unknown): response is MyResponse {
-  return !!(
-    response &&
-    typeof response === 'object' &&
-    'requiredField' in response &&
-    // ...additional discriminant checks
-  );
-}
-```
-
-### TypeScript Configuration
-
-- **Target**: ES2020
-- **Strict mode**: Enabled
-- **Module resolution**: `bundler` (base), `ESNext` (ESM build), `CommonJS`/`node` (CJS build)
-- **Declarations**: Generated for ESM build only (with source maps and declaration maps)
-- Tests (`*.test.ts`, `*.spec.ts`) are excluded from compilation
-
-### Code Style
-
-Configured via Prettier (`.prettierrc`): single quotes, semicolons, trailing commas `es5`, 80-char print width, 2-space indentation. ESLint uses `@typescript-eslint` with `no-explicit-any` as warning, `no-unused-vars` ignoring `_`-prefixed args.
-
-## Common Tasks
-
-### Adding a New Type to an Existing Module
-
-1. Edit the appropriate `*-types.ts` file in `src/types/<module>/`
-2. Define interfaces/types/enums as named exports
-3. Import shared types from `@sudobility/types` (e.g., `Optional`, `ChainType`, `ApiResponse`, `WalletData`)
-4. Add re-exports to the module's `index.ts`
-5. If adding type guards, follow the `is*` prefix convention
-6. Write tests in the corresponding `*.test.ts` file
-7. Verify: `bun run typecheck && bun run lint && bun run test`
-8. Build: `bun run build`
-
-### Adding a New Type Module
-
-1. Create a new directory under `src/types/` (e.g., `src/types/newmodule/`)
-2. Create `newmodule-types.ts` with interfaces, enums, and type guards
-3. Create `index.ts` that re-exports everything from `newmodule-types.ts`
-4. Add `export * from './newmodule';` to `src/types/index.ts`
-5. Create `newmodule-types.test.ts` with tests for enums, type guards, and helpers
-6. Run `bun run verify`
-
-### Testing Guidelines
-
-Tests use Vitest with global test functions (`describe`, `it`, `expect`) and are co-located with source. Coverage excludes `index.ts` barrel files. Focus areas:
-1. **Type guards** -- valid and invalid inputs
-2. **Factory functions** -- correct default values and overrides
-3. **Enums** -- verify string values match expected constants
-4. **Type compatibility** -- ensure interfaces can be instantiated correctly
-
-## Peer / Key Dependencies
-
-| Dependency | Role |
-|-----------|------|
-| `@sudobility/types` (peer, ^1.9.51) | Shared utility types: `Optional`, `ChainType`, `WalletData`, `ApiResponse`, `BaseResponse`, `PaginatedResponse`, `MessageBase`, `UnifiedError` |
-| `typescript` (dev, ^5.9.3) | TypeScript compiler |
-| `vitest` (dev, ^4.0.16) | Test runner |
-| `@vitest/coverage-v8` (dev) | Coverage provider |
-| `eslint` + `@typescript-eslint/*` (dev) | Linting |
-| `prettier` (dev) | Code formatting |
-| `rimraf` (dev) | Clean script |
-
-## Git Workflow
-
-- Do not use feature branches for code changes. Always stay on the current branch.
+See `plans/IMPROVEMENTS.md` for the standing improvement backlog.
