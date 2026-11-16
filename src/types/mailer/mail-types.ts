@@ -6,14 +6,14 @@
  * and consistent structure for all client interactions.
  */
 
-import type {
-  Optional,
-  BaseResponse,
-  PaginatedResponse,
-  MessageBase,
-  UnifiedError,
+import {
+  ChainType,
+  type Optional,
+  type BaseResponse,
+  type PaginatedResponse,
+  type MessageBase,
+  type UnifiedError,
 } from '@sudobility/types';
-import { ChainType } from '@sudobility/types';
 
 // =======================
 // Enums
@@ -448,8 +448,7 @@ export interface MessageHistoryItem extends MessageBase {
  * Paginated list of {@link MessageHistoryItem} entries. Extends
  * {@link PaginatedResponse} from `@sudobility/types`.
  */
-export interface MessageHistoryResponse
-  extends PaginatedResponse<MessageHistoryItem> {}
+export interface MessageHistoryResponse extends PaginatedResponse<MessageHistoryItem> {}
 
 /**
  * Response for querying delegation status.
